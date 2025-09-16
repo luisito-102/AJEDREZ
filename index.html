@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Ajedrez — Versión 1</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Ajedrez — v1 (movimientos básicos)</h1>
+    <div class="controls">
+      <button id="btn-reiniciar">Reiniciar</button>
+      <span id="turno">Turno: ♙ Blancas</span>
+    </div>
+  </header>
+
+  <main>
+    <div id="tablero" class="tablero" aria-label="Tablero de ajedrez"></div>
+    <aside class="panel">
+      <h2>Movimientos</h2>
+      <ol id="lista-mov"></ol>
+      <p class="nota">
+        Versión 1: <br>
+        ✓ Movimientos legales básicos y capturas<br>
+        ✓ Peón mueve 1 (o 2 desde inicio), captura en diagonal<br>
+        ✓ Promoción a Dama automática<br>
+        ✗ Sin enroque<br>
+        ✗ Sin jaque/jaque mate<br>
+        ✗ Sin captura al paso<br>
+      </p>
+    </aside>
+  </main>
+
+  <footer>
+    Siguiente versión: enroque, jaque/jaque mate, captura al paso y detección de jaque.
+  </footer>
+
+  <script src="./script.js"></script>
+</body>
+</html>
