@@ -1,0 +1,66 @@
+:root{
+  --dark:#2e3a46;
+  --light:#f0f4f8;
+  --green:#3b82f6;
+  --accent:#22c55e;
+  --warn:#f59e0b;
+  --square-size:min(10vw, 70px);
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,Arial,Helvetica,sans-serif;background:#f7fafc;color:#111827}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#0f172a;color:#fff}
+header h1{font-size:18px;margin:0}
+.controls{display:flex;gap:12px;align-items:center}
+button{padding:8px 12px;border:0;border-radius:8px;background:#0ea5e9;color:#fff;font-weight:600;cursor:pointer}
+button:hover{filter:brightness(1.05)}
+#turno{font-weight:700}
+
+main{display:grid;grid-template-columns:1fr 280px;gap:16px;max-width:1100px;margin:18px auto;padding:0 16px}
+.tablero{
+  width:calc(var(--square-size)*8);
+  height:calc(var(--square-size)*8);
+  display:grid;
+  grid-template-columns:repeat(8,1fr);
+  border:6px solid #0f172a;
+  border-radius:12px;
+  overflow:hidden;
+  background:#111827;
+}
+.celda{
+  width:var(--square-size);
+  height:var(--square-size);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:calc(var(--square-size)*0.6);
+  user-select:none;
+  position:relative;
+  transition:background .1s ease;
+}
+.c-dark{background:#739552}
+.c-light{background:#ebecd0}
+.celda.seleccionada{outline:4px solid var(--green); outline-offset:-4px}
+.celda.destino::after{
+  content:"";
+  width:30%;
+  height:30%;
+  border-radius:50%;
+  background:rgba(59,130,246,.75);
+  box-shadow:0 0 0 2px rgba(255,255,255,.4) inset;
+}
+.celda.capture{background:#ef4444aa}
+.fantasma{
+  position:absolute;inset:0;border:3px dashed #22c55e;border-radius:8px;pointer-events:none
+}
+
+.panel{
+  background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px;max-height:calc(var(--square-size)*8);
+  overflow:auto;
+}
+.panel h2{margin:6px 0 8px 0}
+#lista-mov{margin:6px 0 0 18px;padding:0}
+.nota{font-size:12px;color:#6b7280}
+footer{max-width:1100px;margin:12px auto;color:#6b7280;font-size:12px;padding:0 16px}
+.pieza{cursor:pointer}
+.blanca{filter:drop-shadow(0 1px 0 #0002)}
+.negra{filter:drop-shadow(0 1px 0 #0002)}
