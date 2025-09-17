@@ -1,233 +1,262 @@
-// Ajedrez v1 — movimientos básicos sin jaque/jaque mate/enroque/al paso
-// Representación simple: tablero 8x8, piezas Unicode
+// Ajedrez completo + IA (minimax) usando chess.js
+// Mantiene tus IDs existentes: #tablero, #btn-reiniciar, #turno, #lista-mov
+// No necesitas cambiar HTML: al cargar, te preguntará el MODO, COLOR y DIFICULTAD.
 
-const tableroEl = document.getElementById("tablero");
-const listaMovEl = document.getElementById("lista-mov");
-const turnoEl = document.getElementById("turno");
-const btnReiniciar = document.getElementById("btn-reiniciar");
+(() => {
+  // ==== DOM ====
+  const tableroEl = document.getElementById("tablero");
+  const listaMovEl = document.getElementById("lista-mov");
+  const turnoEl = document.getElementById("turno");
+  const btnReiniciar = document.getElementById("btn-reiniciar");
 
-const VACIO = null;
-const BLANCAS = "w";
-const NEGRAS = "b";
+  // ==== Config elegida por el usuario ====
+  let mode = prompt("Modo: 'hvh' (humano vs humano) o 'hva' (humano vs máquina)", "hva");
+  if (mode !== "hvh" && mode !== "hva") mode = "hva";
+  let humanColor = prompt("Elige color: 'w' (blancas) o 'b' (negras)", "w");
+  if (humanColor !== "w" && humanColor !== "b") humanColor = "w";
+  let depth = parseInt(prompt("Dificultad IA (1-4). 3 = bueno, 4 = fuerte (más lento)", "3") || "3", 10);
+  depth = Math.max(1, Math.min(4, isFinite(depth) ? depth : 3));
 
-const PIEZAS = {
-  wK: "♔", wQ: "♕", wR: "♖", wB: "♗", wN: "♘", wP: "♙",
-  bK: "♚", bQ: "♛", bR: "♜", bB: "♝", bN: "♞", bP: "♟︎"
-};
+  // ==== Juego (chess.js maneja TODAS las reglas) ====
+  let game = new Chess(); // Reglas oficiales: jaque, mate, enroque, al paso, promoción, tablas, etc.
+  let selected = null;    // {sq, moves[]}
+  let thinking = false;
 
-// Estado del juego
-let tablero = [];
-let turno = BLANCAS;
-let seleccion = null;     // {r,c}
-let destinos = [];        // [{r,c}, ...]
-let movLog = [];
+  const files = ["a","b","c","d","e","f","g","h"];
 
-// Inicializar tablero
-function inicial() {
-  tablero = Array.from({length:8}, ()=> Array(8).fill(VACIO));
-  // Negras
-  tablero[0] = ["bR","bN","bB","bQ","bK","bB","bN","bR"];
-  tablero[1] = Array(8).fill("bP");
-  // Blancas
-  tablero[6] = Array(8).fill("wP");
-  tablero[7] = ["wR","wN","wB","wQ","wK","wB","wN","wR"];
-  turno = BLANCAS;
-  seleccion = null;
-  destinos = [];
-  movLog = [];
-  dibujar();
-  actualizarTurno();
-  listaMovEl.innerHTML = "";
-}
-
-// Dibujar tablero y piezas
-function dibujar(){
-  tableroEl.innerHTML = "";
-  for(let r=0;r<8;r++){
-    for(let c=0;c<8;c++){
-      const cel = document.createElement("div");
-      cel.className = `celda ${(r+c)%2===0 ? "c-light":"c-dark"}`;
-      cel.dataset.r = r;
-      cel.dataset.c = c;
-
-      // Destinos marcados
-      if(destinos.some(d => d.r===r && d.c===c)){
-        // Si hay pieza rival en destino, color diferente
-        if(tablero[r][c] !== VACIO) cel.classList.add("capture");
-        else cel.classList.add("destino");
-      }
-
-      // Selección
-      if(seleccion && seleccion.r===r && seleccion.c===c){
-        cel.classList.add("seleccionada");
-        const gh = document.createElement("div");
-        gh.className = "fantasma";
-        cel.appendChild(gh);
-      }
-
-      const pieza = tablero[r][c];
-      if(pieza){
-        const span = document.createElement("span");
-        span.textContent = PIEZAS[pieza];
-        span.className = `pieza ${pieza[0]=== "w" ? "blanca":"negra"}`;
-        cel.appendChild(span);
-      }
-
-      cel.addEventListener("click", onClickCelda);
-      tableroEl.appendChild(cel);
-    }
-  }
-}
-
-// Click en casilla
-function onClickCelda(e){
-  const r = +e.currentTarget.dataset.r;
-  const c = +e.currentTarget.dataset.c;
-  const pieza = tablero[r][c];
-
-  // Si ya hay una selección y clic en un destino válido -> mover
-  if(seleccion && destinos.some(d => d.r===r && d.c===c)){
-    mover(seleccion.r, seleccion.c, r, c);
-    seleccion = null;
-    destinos = [];
-    dibujar();
-    return;
+  function statusText() {
+    if (game.in_checkmate()) return "♛ Jaque mate — " + (game.turn()==="w" ? "Negras" : "Blancas") + " ganan";
+    if (game.in_draw())      return "½–½ Tablas";
+    const t = game.turn()==="w" ? "♙ Blancas" : "♟ Negras";
+    return (game.in_check() ? "⚠️ Jaque — " : "Turno: ") + t;
   }
 
-  // Si clic en pieza del turno -> seleccionar y calcular destinos
-  if(pieza && pieza[0] === turno){
-    seleccion = {r,c};
-    destinos = movimientosLegales(r,c, pieza);
-    dibujar();
-  } else {
-    // Clic fuera / pieza rival = limpiar selección
-    seleccion = null;
-    destinos = [];
-    dibujar();
-  }
-}
-
-function actualizarTurno(){
-  turnoEl.textContent = `Turno: ${turno===BLANCAS?"♙ Blancas":"♟ Negras"}`;
-}
-
-// Mover pieza (con promoción de peón a dama automática)
-function mover(r1,c1,r2,c2){
-  const pieza = tablero[r1][c1];
-  const destino = tablero[r2][c2];
-
-  // Ejecutar
-  tablero[r2][c2] = pieza;
-  tablero[r1][c1] = VACIO;
-
-  // Promoción peón
-  if(pieza === "wP" && r2 === 0) tablero[r2][c2] = "wQ";
-  if(pieza === "bP" && r2 === 7) tablero[r2][c2] = "bQ";
-
-  // Log
-  movLog.push(notacion(pieza, r1,c1,r2,c2, destino!==VACIO));
-  renderLog();
-
-  // Cambiar turno
-  turno = (turno===BLANCAS? NEGRAS: BLANCAS);
-  actualizarTurno();
-}
-
-// Mostrar lista de movimientos
-function renderLog(){
-  listaMovEl.innerHTML = "";
-  movLog.forEach((m, i)=>{
-    const li = document.createElement("li");
-    li.textContent = m;
-    listaMovEl.appendChild(li);
-  });
-}
-
-// Generar movimientos legales básicos (sin jaque ni enroque ni al paso)
-function movimientosLegales(r,c,p){
-  const color = p[0]; // w/b
-  const tipo = p[1];  // K,Q,R,B,N,P
-  const moves = [];
-
-  // Helpers
-  const vacio = (rr,cc)=> dentro(rr,cc) && tablero[rr][cc]===VACIO;
-  const rival = (rr,cc)=> dentro(rr,cc) && tablero[rr][cc]!==VACIO && tablero[rr][cc][0]!==color;
-  const libre = (rr,cc)=> dentro(rr,cc) && tablero[rr][cc]===VACIO;
-
-  function rayos(drs){
-    for(const [dr,dc] of drs){
-      let rr=r+dr, cc=c+dc;
-      while(dentro(rr,cc)){
-        if(tablero[rr][cc]===VACIO){ moves.push({r:rr,c:cc}); }
-        else { if(tablero[rr][cc][0]!==color) moves.push({r:rr,c:cc}); break; }
-        rr+=dr; cc+=dc;
-      }
-    }
+  function toGlyph(p){
+    const map = {
+      wp:"♙", wr:"♖", wn:"♘", wb:"♗", wq:"♕", wk:"♔",
+      bp:"♟", br:"♜", bn:"♞", bb:"♝", bq:"♛", bk:"♚"
+    };
+    return map[p.color + p.type];
   }
 
-  switch(tipo){
-    case "P": {
-      const dir = (color===BLANCAS? -1: +1);
-      const filaInicio = (color===BLANCAS? 6: 1);
-      // Avance 1
-      if(libre(r+dir, c)) moves.push({r:r+dir,c});
-      // Avance 2 desde inicio
-      if(r===filaInicio && libre(r+dir,c) && libre(r+2*dir,c)) moves.push({r:r+2*dir,c});
-      // Capturas diagonales
-      if(rival(r+dir, c-1)) moves.push({r:r+dir,c:c-1});
-      if(rival(r+dir, c+1)) moves.push({r:r+dir,c:c+1});
-      break;
-    }
-    case "N": { // Caballo
-      const saltos = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
-      for(const [dr,dc] of saltos){
-        const rr=r+dr, cc=c+dc;
-        if(!dentro(rr,cc)) continue;
-        if(tablero[rr][cc]===VACIO || tablero[rr][cc][0]!==color) moves.push({r:rr,c:cc});
-      }
-      break;
-    }
-    case "B": { // Alfil
-      rayos([[1,1],[1,-1],[-1,1],[-1,-1]]);
-      break;
-    }
-    case "R": { // Torre
-      rayos([[1,0],[-1,0],[0,1],[0,-1]]);
-      break;
-    }
-    case "Q": { // Dama
-      rayos([[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]);
-      break;
-    }
-    case "K": { // Rey (sin enroque)
-      for(const dr of [-1,0,1]){
-        for(const dc of [-1,0,1]){
-          if(dr===0 && dc===0) continue;
-          const rr=r+dr, cc=c+dc;
-          if(!dentro(rr,cc)) continue;
-          if(tablero[rr][cc]===VACIO || tablero[rr][cc][0]!==color) moves.push({r:rr,c:cc});
+  function drawBoard(){
+    tableroEl.innerHTML = "";
+    if (turnoEl) turnoEl.textContent = statusText();
+
+    // Orienta el tablero según color del humano (si juega vs IA)
+    const orient = (mode==="hva" && humanColor==="b")
+      ? { rStart:7, rStep:-1, cStart:7, cStep:-1 } // negras abajo
+      : { rStart:7, rStep:-1, cStart:0, cStep:1 }; // blancas abajo (por defecto)
+
+    for (let rr=0; rr<8; rr++){
+      for (let cc=0; cc<8; cc++){
+        const r = orient.rStart + rr*orient.rStep;
+        const c = orient.cStart + cc*orient.cStep;
+        const sq = files[c] + (r+1);
+        const piece = game.get(sq);
+
+        const cel = document.createElement("div");
+        cel.className = "celda " + ((r+c)%2===0 ? "c-light" : "c-dark");
+        cel.dataset.sq = sq;
+
+        // resaltado destinos
+        if (selected && selected.moves.some(m => m.to === sq)) {
+          if (game.get(sq)) cel.classList.add("capture");
+          else cel.classList.add("destino");
         }
+        if (selected && selected.sq === sq) cel.classList.add("seleccionada");
+
+        if (piece){
+          const span = document.createElement("span");
+          span.textContent = toGlyph(piece);
+          span.className = "pieza " + (piece.color==="w" ? "blanca" : "negra");
+          cel.appendChild(span);
+        }
+
+        cel.addEventListener("click", onClickSquare);
+        tableroEl.appendChild(cel);
       }
-      break;
     }
   }
-  return moves;
-}
 
-function dentro(r,c){ return r>=0 && r<8 && c>=0 && c<8; }
+  function onClickSquare(e){
+    if (thinking) return; // IA pensando
+    const sq = e.currentTarget.dataset.sq;
+    const p = game.get(sq);
 
-// Notación simple: Pieza x destino (sin +, #, etc.)
-function notacion(p, r1,c1,r2,c2, captura){
-  const piezas = {K:"R", Q:"D", R:"T", B:"A", N:"C", P:""};
-  const letra = piezas[p[1]];
-  const col = ["a","b","c","d","e","f","g","h"];
-  const origen = col[c1]+(8-r1);
-  const destino = col[c2]+(8-r2);
-  return `${p[0]==="w"?"(B)":"(N)"} ${letra}${captura?"x":""}${destino}`;
-}
+    const humanTurn = (mode==="hvh") || (game.turn() === humanColor);
+    if (!humanTurn) return;
 
-// Reiniciar
-btnReiniciar.addEventListener("click", inicial);
+    // seleccionar pieza propia
+    if (!selected){
+      if (p && p.color === game.turn()){
+        selected = { sq, moves: legalMovesFrom(sq) };
+        drawBoard();
+      }
+      return;
+    }
 
-// Start
-inicial();
+    // cambiar selección a otra pieza propia
+    if (p && p.color === game.turn()){
+      selected = { sq, moves: legalMovesFrom(sq) };
+      drawBoard();
+      return;
+    }
+
+    // intentar mover
+    tryMove(selected.sq, sq);
+  }
+
+  function legalMovesFrom(fromSq){
+    return game.moves({verbose:true}).filter(m => m.from === fromSq);
+  }
+
+  function needsPromotion(from, to){
+    const piece = game.get(from);
+    if (!piece || piece.type !== "p") return false;
+    if (piece.color === "w" && to.endsWith("8")) return true;
+    if (piece.color === "b" && to.endsWith("1")) return true;
+    return false;
+  }
+
+  function askPromotion(){
+    let p = prompt("Promocionar a (q=Reina, r=Torre, b=Alfil, n=Caballo):", "q");
+    p = (p||"q").toLowerCase();
+    if (!["q","r","b","n"].includes(p)) p = "q";
+    return p;
+  }
+
+  function tryMove(from, to){
+    let move;
+    if (needsPromotion(from, to)){
+      const promo = askPromotion();
+      move = game.move({ from, to, promotion: promo });
+    } else {
+      move = game.move({ from, to });
+    }
+
+    // Si movimiento es ilegal, no hace nada (chess.js valida jaque, enroque, al paso, etc.)
+    if (!move) { selected=null; drawBoard(); return; }
+
+    // log
+    pushMove(move.san);
+
+    selected = null;
+    drawBoard();
+
+    // fin de partida
+    if (game.game_over()) return;
+
+    // turno IA
+    if (mode==="hva" && game.turn() !== humanColor){
+      setTimeout(aiMove, 50);
+    }
+  }
+
+  function pushMove(san){
+    if (!listaMovEl) return;
+    const li = document.createElement("li");
+    li.textContent = san;
+    listaMovEl.appendChild(li);
+    listaMovEl.scrollTop = listaMovEl.scrollHeight;
+  }
+
+  // ==== IA: minimax con poda (negamax) ====
+  function aiMove(){
+    thinking = true;
+    const { best } = searchRoot(game, depth);
+    if (best) {
+      game.move(best);
+      pushMove(best.san);
+    }
+    thinking = false;
+    drawBoard();
+  }
+
+  function searchRoot(chess, d){
+    let best = null;
+    let bestScore = -Infinity;
+    const moves = chess.moves({verbose:true});
+    // Un poco de orden: capturas primero
+    moves.sort((a,b)=> (b.flags.includes("c")?1:0) - (a.flags.includes("c")?1:0));
+
+    for (const m of moves){
+      chess.move(m);
+      const score = -negamax(chess, d-1, -Infinity, +Infinity);
+      chess.undo();
+      if (score > bestScore){
+        bestScore = score;
+        best = m;
+      }
+    }
+    return { bestScore, best };
+  }
+
+  function negamax(chess, d, alpha, beta){
+    if (d === 0 || chess.game_over()) return evaluate(chess);
+
+    let max = -Infinity;
+    const moves = chess.moves({verbose:true});
+    moves.sort((a,b)=> (b.flags.includes("c")?1:0) - (a.flags.includes("c")?1:0));
+    for (const m of moves){
+      chess.move(m);
+      const score = -negamax(chess, d-1, -beta, -alpha);
+      chess.undo();
+      if (score > max) max = score;
+      if (score > alpha) alpha = score;
+      if (alpha >= beta) break;
+    }
+    return max;
+  }
+
+  // Evaluación: material + tablas PST (suficiente para jugar bien a profundidad 3–4)
+  const VAL = { p:100, n:320, b:330, r:500, q:900, k:0 };
+  const PST_W = {
+    p:[0,0,0,0,0,0,0,0, 50,50,50,50,50,50,50,50, 10,10,20,30,30,20,10,10, 5,5,10,25,25,10,5,5, 0,0,0,20,20,0,0,0, 5,-5,-10,0,0,-10,-5,5, 5,10,10,-20,-20,10,10,5, 0,0,0,0,0,0,0,0],
+    n:[-50,-40,-30,-30,-30,-30,-40,-50,-40,-20,0,0,0,0,-20,-40,-30,0,10,15,15,10,0,-30,-30,5,15,20,20,15,5,-30,-30,0,15,20,20,15,0,-30,-30,5,10,15,15,10,5,-30,-40,-20,0,5,5,0,-20,-40,-50,-40,-30,-30,-30,-30,-40,-50],
+    b:[-20,-10,-10,-10,-10,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,10,10,5,0,-10,-10,5,5,10,10,5,5,-10,-10,0,10,10,10,10,0,-10,-10,10,10,10,10,10,10,-10,-10,5,0,0,0,0,5,-10,-20,-10,-10,-10,-10,-10,-10,-20],
+    r:[0,0,0,0,0,0,0,0, 5,10,10,10,10,10,10,5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, 0,0,0,5,5,0,0,0],
+    q:[-20,-10,-10,-5,-5,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,5,5,5,0,-10,-5,0,5,5,5,5,0,-5, 0,0,5,5,5,5,0,-5,-10,5,5,5,5,5,0,-10,-10,0,5,0,0,0,0,-10,-20,-10,-10,-5,-5,-10,-10,-20],
+    k:[-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-20,-30,-30,-40,-40,-30,-30,-20,-10,-20,-20,-20,-20,-20,-20,-10,20,20,0,0,0,0,20,20,20,30,10,0,0,10,30,20]
+  };
+  function evaluate(chess){
+    if (chess.in_checkmate()) return chess.turn()==="w" ? -Infinity : +Infinity;
+    if (chess.in_draw() || chess.in_stalemate() || chess.in_threefold_repetition() || chess.insufficient_material()) return 0;
+
+    let score = 0;
+    const board = chess.board(); // 8x8
+    for (let r=0;r<8;r++){
+      for (let c=0;c<8;c++){
+        const p = board[r][c];
+        if (!p) continue;
+        const val = VAL[p.type];
+        // PST blanca tal cual, para negras espejamos
+        const idxW = r*8+c;
+        const idxB = (7-r)*8 + (7-c);
+        const pst = PST_W[p.type][ p.color==="w" ? idxW : idxB ];
+        score += (p.color==="w" ? +1 : -1) * (val + pst);
+      }
+    }
+    // Pequeña bonificación por movilidad
+    const m = chess.moves().length;
+    score += (chess.turn()==="w" ? -m : +m) * 0.5;
+    return score;
+  }
+
+  // ==== Nueva partida / Botón Reiniciar ====
+  function nueva(){
+    game = new Chess();
+    selected = null;
+    if (listaMovEl) listaMovEl.innerHTML = "";
+    drawBoard();
+    // Si la máquina juega con blancas, que mueva ya
+    if (mode==="hva" && humanColor==="b"){
+      setTimeout(aiMove, 80);
+    }
+  }
+  if (btnReiniciar) btnReiniciar.addEventListener("click", nueva);
+
+  // ==== Inicio ====
+  nueva();
+
+})();
