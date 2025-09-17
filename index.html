@@ -4,102 +4,70 @@
   <meta charset="utf-8" />
   <title>Ajedrez — Reglas completas + IA</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <!-- (Opcional) Si tienes un styles.css aparte, déjalo así:
   <link rel="stylesheet" href="./styles.css" />
-  -->
-
-  <!-- Estilos mínimos para que el tablero se vea bien aunque no haya styles.css -->
   <style>
-    :root{
-      --square-size:min(10vw, 72px);
-      --bg:#f7fafc; --card:#fff; --text:#111827;
-    }
-    *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text)}
+    /* Estilos mínimos por si tu styles.css no carga */
+    :root{--square:min(10vw,72px)}
+    *{box-sizing:border-box} body{margin:0;font-family:system-ui,Arial;background:#f7fafc;color:#111}
     header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#0f172a;color:#fff}
-    header h1{font-size:18px;margin:0}
-    .controls{display:flex;gap:12px;align-items:center}
-    button{padding:8px 12px;border:0;border-radius:8px;background:#0ea5e9;color:#fff;font-weight:600;cursor:pointer}
-    button:hover{filter:brightness(1.05)}
-    #turno{font-weight:700}
-
-    main{display:grid;grid-template-columns:1fr 280px;gap:16px;max-width:1100px;margin:18px auto;padding:0 16px}
-    .tablero{
-      width:calc(var(--square-size)*8);
-      height:calc(var(--square-size)*8);
-      display:grid;
-      grid-template-columns:repeat(8,1fr);
-      border:6px solid #0f172a;
-      border-radius:12px;
-      overflow:hidden;
-      background:#111827;
-    }
-    .celda{
-      width:var(--square-size);
-      height:var(--square-size);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-size:calc(var(--square-size)*0.6);
-      user-select:none;
-      position:relative;
-      transition:background .1s ease;
-    }
-    .c-dark{background:#739552}
-    .c-light{background:#ebecd0}
-    .celda.seleccionada{outline:4px solid #22c55e; outline-offset:-4px}
-    .celda.destino::after{
-      content:""; width:26%; height:26%; border-radius:50%;
-      background:rgba(59,130,246,.8); box-shadow:0 0 0 2px rgba(255,255,255,.4) inset;
-    }
-    .celda.capture{box-shadow: inset 0 0 0 4px rgba(239,68,68,.8)}
-    .pieza{cursor:pointer; filter:drop-shadow(0 1px 0 #0002)}
-    .blanca{ }
-    .negra{ }
-
-    .panel{
-      background:var(--card); border:1px solid #e5e7eb; border-radius:12px;
-      padding:12px; max-height:calc(var(--square-size)*8); overflow:auto;
-    }
-    .panel h2{margin:6px 0 8px 0}
+    header h1{margin:0;font-size:18px}
+    .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    select,button,input{padding:8px;border-radius:8px;border:1px solid #e5e7eb}
+    button{background:#0ea5e9;color:#fff;border:0;font-weight:600;cursor:pointer}
+    main{display:grid;grid-template-columns:auto 1fr;gap:16px;max-width:1100px;margin:14px auto;padding:0 14px}
+    .tablero{display:grid;grid-template-columns:repeat(8,var(--square));grid-auto-rows:var(--square);
+      border:6px solid #0f172a;border-radius:12px;overflow:hidden;background:#111827}
+    .celda{display:flex;align-items:center;justify-content:center;font-size:calc(var(--square)*0.64);position:relative;user-select:none}
+    .c-light{background:#ebecd0} .c-dark{background:#739552}
+    .seleccionada{outline:4px solid #22c55e;outline-offset:-4px}
+    .destino::after{content:"";width:26%;height:26%;border-radius:50%;background:rgba(59,130,246,.8)}
+    .capture{box-shadow: inset 0 0 0 4px rgba(239,68,68,.8)}
+    .pieza{filter:drop-shadow(0 1px 0 #0002)}
+    .panel{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px;max-height:calc(var(--square)*8);overflow:auto}
     #lista-mov{margin:6px 0 0 18px;padding:0}
     .nota{font-size:12px;color:#6b7280}
-    footer{max-width:1100px;margin:12px auto;color:#6b7280;font-size:12px;padding:0 16px}
   </style>
 </head>
 <body>
   <header>
-    <h1>Ajedrez — v2 (reglas completas)</h1>
+    <h1>Ajedrez — reglas completas + IA</h1>
     <div class="controls">
-      <button id="btn-reiniciar">Reiniciar</button>
-      <span id="turno">Turno: ♙ Blancas</span>
+      <label>Modo
+        <select id="mode">
+          <option value="hvh">Humano vs Humano</option>
+          <option value="hva" selected>Humano vs Máquina</option>
+        </select>
+      </label>
+      <label>Tu color
+        <select id="humanColor">
+          <option value="w" selected>Blancas</option>
+          <option value="b">Negras</option>
+        </select>
+      </label>
+      <label>Dificultad
+        <select id="depth">
+          <option>1</option><option>2</option><option selected>3</option><option>4</option>
+        </select>
+      </label>
+      <button id="btn-reiniciar">Nueva partida</button>
+      <span id="turno" style="font-weight:700">Turno: ♙ Blancas</span>
     </div>
   </header>
 
   <main>
-    <!-- Tablero -->
     <div id="tablero" class="tablero" aria-label="Tablero de ajedrez"></div>
-
-    <!-- Panel lateral -->
     <aside class="panel">
-      <h2>Movimientos</h2>
+      <h3>Movimientos</h3>
       <ol id="lista-mov"></ol>
       <p class="nota">
-        Reglas completas con <code>chess.js</code> (jaque, mate, enroque, al paso, promoción, tablas).<br/>
-        Al cargar, el script te pide (por ventanitas) <b>modo</b> (hvh/hva), <b>color</b> (w/b) y <b>dificultad</b> (1–4).
+        Reglas por <code>chess.js</code>: jaque, jaque mate, enroque, al paso, promoción y tablas.  
+        La IA usa minimax con poda (3 = bueno, 4 = fuerte).
       </p>
     </aside>
   </main>
 
-  <footer>
-    Si quieres, luego quitamos las ventanitas (prompts) y ponemos botones/menús en la página.
-  </footer>
-
-  <!-- Reglas completas: chess.js (debe ir ANTES de tu script.js) -->
+  <!-- IMPORTANTE: chess.js DEBE IR ANTES de tu script -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.13.4/chess.min.js"></script>
-
-  <!-- Tu lógica: el script.js que ya reemplazaste (con prompts + IA) -->
   <script src="./script.js"></script>
 </body>
 </html>
