@@ -2,13 +2,14 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>Ajedrez — Versión 1</title>
+  <title>Ajedrez — Reglas completas + IA</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Tu hoja de estilos -->
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
   <header>
-    <h1>Ajedrez — v1 (movimientos básicos)</h1>
+    <h1>Ajedrez — v2 (reglas completas)</h1>
     <div class="controls">
       <button id="btn-reiniciar">Reiniciar</button>
       <span id="turno">Turno: ♙ Blancas</span>
@@ -16,26 +17,29 @@
   </header>
 
   <main>
+    <!-- Tablero -->
     <div id="tablero" class="tablero" aria-label="Tablero de ajedrez"></div>
+
+    <!-- Panel lateral -->
     <aside class="panel">
       <h2>Movimientos</h2>
       <ol id="lista-mov"></ol>
       <p class="nota">
-        Versión 1: <br>
-        ✓ Movimientos legales básicos y capturas<br>
-        ✓ Peón mueve 1 (o 2 desde inicio), captura en diagonal<br>
-        ✓ Promoción a Dama automática<br>
-        ✗ Sin enroque<br>
-        ✗ Sin jaque/jaque mate<br>
-        ✗ Sin captura al paso<br>
+        Esta versión usa reglas completas (jaque, mate, enroque, al paso, promoción, tablas)
+        y puede jugar contra la máquina (minimax). La elección de modo, color y dificultad
+        aparece en ventanitas (prompts) al cargar.
       </p>
     </aside>
   </main>
 
   <footer>
-    Siguiente versión: enroque, jaque/jaque mate, captura al paso y detección de jaque.
+    Si quieres, después cambiamos los prompts por botoncitos en la página para elegir modo/color/dificultad.
   </footer>
 
+  <!-- Librería de reglas (chess.js). Debe ir ANTES de tu script.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.13.4/chess.min.js"></script>
+
+  <!-- Tu lógica (la que ya reemplazaste con prompts + IA) -->
   <script src="./script.js"></script>
 </body>
 </html>
